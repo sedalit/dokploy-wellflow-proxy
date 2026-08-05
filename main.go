@@ -1,9 +1,9 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 )
@@ -14,26 +14,50 @@ func main() {
 		log.Fatal("TARGET_URL is not set")
 	}
 
-	u, err := url.Parse(target)
+	baseURL, err := url.Parse(target)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(u)
+	client := &http.Client{}
 
-	// Не переписываем Host, если целевой сервер ожидает оригинальный.
-	originalDirector := proxy.Director
-	proxy.Director = func(r *http.Request) {
-		originalDirector(r)
-		// Если нужен Host целевого сервера, оставь следующую строку:
-		// r.Host = u.Host
-	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		dest := *baseURL
+		dest.Path = r.URL.Path
+		dest.RawQuery = r.URL.RawQuery
+
+		req, err := http.NewRequest(r.Method, dest.String(), r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Копируем заголовки
+		req.Header = r.Header.Clone()
+
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Копируем заголовки ответа
+		for k, values := range resp.Header {
+			for _, v := range values {
+				w.Header().Add(k, v)
+			}
+		}
+
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("Listening on :%s -> %s", port, target)
-	log.Fatal(http.ListenAndServe(":"+port, proxy))
+	log.Printf("Listening on :%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
