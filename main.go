@@ -26,6 +26,7 @@ func main() {
 		dest.Path = r.URL.Path
 		dest.RawQuery = r.URL.RawQuery
 
+		log.Printf("Proxying request to: %s", dest.String())
 		req, err := http.NewRequest(r.Method, dest.String(), r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
