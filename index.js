@@ -57,11 +57,6 @@ const server = http.createServer((req, res) => {
   }
 
   const dest = new URL(baseURL.toString());
-  const incoming = new URL(req.url, "http://placeholder");
-
-  dest.pathname = incoming.pathname;
-  dest.search = incoming.search;
-
   console.log(`Proxying request to: ${dest.toString()}`);
 
   const transport = dest.protocol === "https:" ? https : http;
