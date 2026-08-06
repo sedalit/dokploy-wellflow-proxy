@@ -1,15 +1,12 @@
-FROM golang:1.24 AS builder
+FROM node:22-alpine
 
 WORKDIR /app
 
-COPY main.go .
+COPY package.json .
+COPY index.js .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o proxy .
-
-FROM alpine:latest
-
-COPY --from=builder /app/proxy /proxy
+ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["/proxy"]
+CMD ["node", "index.js"]
